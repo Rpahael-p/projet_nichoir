@@ -96,8 +96,29 @@ L'objet Rtc contient:
 
     &ensp; Retourne True si la tension de la pile du RTC est faible, False sinon
 
+- **setAlarmIRQ()**
 
+    &ensp; Interuption :  
+    &ensp; &ensp; &ensp; ● après x secondes  
+    &ensp; &ensp; &ensp; ● à une heure précise chaque jour  
+    &ensp; &ensp; &ensp; ● Une date et heure précise  
+    &ensp; Activation d'une sortie open drain ouvrant un pmos laissant passé la tension de la batterie rallumant l'esp32
 
+- **getIRQstatus()**
+
+    &ensp; Retourne True si alarme en attente, False sinon
+
+- **clearIRQ()**
+
+    &ensp; efface le flag d'interuption utilisé par le IRQstatus
+
+- **disableIRQ()**
+
+    &ensp; Désactive toutes les interuptions
+
+- **setSystemTimeFromRtc()**
+
+    &ensp; Met à jour l'heure du système
 
 
 <br>
@@ -109,3 +130,27 @@ L'objet Rtc contient:
 <br>
 
 # Camera
+
+## Objets
+- camera_fb_t fb
+- sensor_t sensor
+- camera_config_t config
+
+Ces différents objets sont définis dans les fichiers camera.h et sensor.h
+
+## Fonctions
+
+Toutes les fonctions passent par la librairie esp_camera
+
+- **begin()**
+
+    &ensp; Initie la caméra, le capteur
+
+- **deinit()**  
+- **get()**
+
+    &ensp; Prend une photo et l'écris dans fb
+
+- **free()**
+
+    &ensp; Libère l'espace utilisé par fb
