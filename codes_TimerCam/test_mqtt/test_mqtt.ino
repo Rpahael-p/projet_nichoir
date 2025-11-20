@@ -4,13 +4,10 @@
 WiFiClient espClient;             // Create a Wi-Fi client for MQTT
 PubSubClient client(espClient);   // Create an MQTT client using espClient
 
-// const char* ssid     = "Proximus-Home-06B0";   // Alternative Wi-Fi SSID (commented)
-// const char* password = "wm24mn4snd6rh";        // Alternative Wi-Fi password (commented)
+const char* ssid     = "SSID";                    // Current Wi-Fi SSID
+const char* password = "password";                // Current Wi-Fi password
 
-const char* ssid     = "electroProjectWifi";      // Current Wi-Fi SSID
-const char* password = "B1MesureEnv";             // Current Wi-Fi password
-
-const char* mqtt_server = "192.168.2.31";         // MQTT broker IP address
+const char* mqtt_server = "IP";                   // MQTT broker IP address
 const int mqtt_port = 1883;                       // MQTT port (default 1883)
 
 void reconnect() {                                // Function to reconnect to the MQTT broker
