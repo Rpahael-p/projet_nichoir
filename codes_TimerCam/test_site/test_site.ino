@@ -6,12 +6,19 @@
 const char* ap_ssid = "TimerCAM-AP";
 const char* ap_password = "12345678";
 
-String wifi_ssid;
-String wifi_password;
+IPAddress local_IP(192,168,4,1);
+IPAddress gateway(192,168,4,1);
+IPAddress subnet(255,255,255,0);
+
+
+String wifi_ssid = "Test";
+String wifi_password = "Test";
 
 bool try_connect = true;
 bool connected = false;
-
+bool connecting = true;
+bool ap_started = false;
+unsigned long start_connecting = millis();
 WebServer server(80);
 
 Preferences prefs;
@@ -33,17 +40,34 @@ const char* htmlForm = R"rawliteral(
 </html>
 )rawliteral";
 
+void get_wifi_prefs() {
+    prefs.begin("config", false);
+    wifi_ssid = prefs.getString("ssid", "None");
+    wifi_password = prefs.getString("mdp", "None");
+    prefs.end();
+}
+
+void set_wifi_prefs() {
+    prefs.begin("config", false);
+    prefs.putString("ssid", wifi_ssid);
+    prefs.putString("mdp", wifi_password);
+    prefs.end();
+}
+
+bool is_stored_prefs_same() {
+    prefs.begin("config", false);
+    bool ssid_same = wifi_ssid == prefs.getString("ssid", "None");
+    bool password_same = wifi_password == prefs.getString("mdp", "None");
+    prefs.end();
+    return ssid_same && password_same;
+}
+
 void handleRoot() {
 
     if (server.method() == HTTP_POST) {
 
         wifi_ssid = server.arg("ssid");
         wifi_password = server.arg("password");
-
-        prefs.begin("config", false);
-        prefs.putString("ssid", wifi_ssid);
-        prefs.putString("mdp", wifi_password);
-        prefs.end();
 
         Serial.println("=== DONNÉES REÇUES ===");
         Serial.print("SSID : ");
@@ -64,6 +88,9 @@ void handleRoot() {
 }
 
 void start_ap() {
+    if (ap_started) return;
+    ap_started = true;
+    WiFi.softAPConfig(local_IP, gateway, subnet);
     WiFi.softAP(ap_ssid, ap_password);
 
     Serial.println("AP SSID: TimerCAM-AP");
@@ -78,51 +105,69 @@ void start_ap() {
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    prefs.begin("config", false);
 
-    wifi_ssid = prefs.getString("ssid", "None");
-    wifi_password = prefs.getString("mdp", "None");
-
-    prefs.end();
-
+    //get_wifi_prefs();
+    
     Serial.print("Loaded ssid = ");
     Serial.println(wifi_ssid);
     
     Serial.print("Loaded pswd = ");
     Serial.println(wifi_password);
 
+    WiFi.mode(WIFI_MODE_APSTA);
+
     start_ap();
+    WiFi.begin(wifi_ssid, wifi_password);
 }
 
 void loop() {
-    if (try_connect) {
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(wifi_ssid, wifi_password);
-        WiFi.setSleep(false);
-        Serial.print("Connecting to WiFi");
-        unsigned long start = millis();
-        while (WiFi.status() != WL_CONNECTED) {
-            delay(500);
-            Serial.print(".");
-            if (millis() - start > 10000) {
-                break;
+    if (WiFi.status() == WL_CONNECTED) {
+        if (WiFi.getMode() & WIFI_MODE_AP) {
+            Serial.print("Stopping the AP");
+            WiFi.softAPdisconnect(true);
+            WiFi.enableAP(false);
+            ap_started = false;
+
+            if (!is_stored_prefs_same()) {
+                set_wifi_prefs();
+            } else {
+                prefs.end();
             }
         }
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println();
-            Serial.print("Connected. IP address: ");
-            Serial.println(WiFi.localIP());
-            try_connect = false;
-        } else {
-            try_connect = false;
+        if (connecting) {
+            Serial.print("Connected to wifi");
+            connecting = false;
+        }
+    } else {
+        if (!(WiFi.getMode() & WIFI_MODE_AP)) {
+            WiFi.enableAP(true);
             start_ap();
         }
-    }
-    if (WiFi.status() != WL_CONNECTED) {
-        connected = false;
+
+        if (! connecting and millis() - start_connecting > 20000) {
+            start_connecting = millis();
+            connecting = true;
+
+            Serial.print("Connecting to wifi ...");
+            WiFi.begin(wifi_ssid, wifi_password);
+        } else if (connecting) {
+            if (millis() - start_connecting > 10000) {
+                Serial.println("Timeout !!!");
+                connecting = false;
+                WiFi.disconnect(true);
+            } else {
+                Serial.print(".");
+            }
+        }
+
         server.handleClient();
-    } else {
-        Serial.println("Je suis connecté");
-        delay(500);
     }
+
+    if (WiFi.getMode() & WIFI_MODE_AP) {
+        Serial.println("AP ON");
+    } else {
+        Serial.println("AP OFF");
+    }
+
+    delay(50);
 }
