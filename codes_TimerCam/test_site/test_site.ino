@@ -27,16 +27,34 @@ const char* htmlForm = R"rawliteral(
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Config Wi-Fi</title>
+        <title>TimerCam Configuration</title>
     </head>
     <body>
-        <h2>Connectez votre Timercam au Wi-Fi</h2>
-        <form action="/" method="POST">
+        <h2>Connect your Timercam to your Wi-Fi</h2>
+        <form action="/connecting" method="POST">
             SSID: <input type="text" name="ssid"><br><br>
-            Mot de passe: <input type="text" name="password"><br><br>
-            <input type="submit" value="Envoyer">
+            Password: <input type="text" name="password"><br><br>
+            <input type="submit" value="Connect">
         </form>
+        <p>After submitting, you will be redirected to a status page.<br>
+        If the connection fails, you will return to this configuration page.<br>
+        If successful, this access point will shut down and the configuration portal will close.</p>    
     </body>
+</html>
+)rawliteral";
+
+const char* htmlConnecting = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connection to your Wi-Fi</title>
+    <meta http-equiv="refresh" content="10; URL=/" />
+</head>
+<body>
+    <h2>Connecting to your network...</h2>
+    <p>If the connection fails, you will be redirected back to the configuration page.</p>    
+    <p>If the connection succeeds, the access point will shut down and this configuration portal will close.</p>  
+</body>
 </html>
 )rawliteral";
 
@@ -63,6 +81,10 @@ bool is_stored_prefs_same() {
 }
 
 void handleRoot() {
+    server.send(200, "text/html", htmlForm);
+}
+
+void handleConnecting() {
 
     if (server.method() == HTTP_POST) {
 
@@ -76,9 +98,7 @@ void handleRoot() {
         Serial.println(wifi_password);
         try_connect = true;
 
-        // IMPORTANT : éviter la re-soumission du POST
-        server.sendHeader("Location", "/");
-        server.send(303);    // Redirect vers GET /
+        server.send(200, "text/html", htmlConnecting);
 
         return;
     }
@@ -99,6 +119,7 @@ void start_ap() {
     Serial.println(WiFi.softAPIP());
 
     server.on("/", handleRoot);
+    server.on("/connecting", handleConnecting);
     server.begin();
 }
 
