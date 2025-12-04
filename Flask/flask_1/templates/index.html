@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -13,15 +13,14 @@
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
-			
         .Image-card {
             position: relative;
             display: inline-block;
             margin: 10px;
         }
-        .Image-card form{
-			pointer-events: none;
-		}
+        .Image-card form {
+            pointer-events: none; /* NE BLOQUE PLUS LES CLICS */
+        }
         .delete-btn {
             position: absolute;
             top: 5px;
@@ -36,12 +35,11 @@
             pointer-events: auto;
         }
         .Image-card a img {
-			max-width: 300px;
-			height: auto;
-			border-radius: 6px;
-			z-index: 1;
-		}
-			
+            max-width: 300px;
+            height: auto;
+            border-radius: 6px;
+            z-index: 1;     
+        }
     </style>
 </head>
 
@@ -51,23 +49,27 @@
         <i class="fa fa-battery-half"></i> Batterie
     </a>
 
+    <a href="{{ url_for('cameras') }}" class="btn btn-secondary mb-3 ms-2">
+        <i class="fa fa-video"></i> Caméras
+    </a>
+
     <h2>Liste des Images</h2>
     
     <form method="GET" class="row g-3 mb-4">
 
-	<!-- Filtre caméra -->
-	<div class="col-md-4">
-		<label class="form-label">Caméra</label>
-		<select name="camera" class="form-select">
-			<option value="">Toutes les caméras</option>
-			{% for c in Cameras %}
-				<option value="{{ c.mac }}" 
-					{% if selected_camera == c.mac %}selected{% endif %}>
-					{% if c.name == "" or c.name is none %}caméra sans nom ({{c.mac}}){% else %}{{ c.name }}{% endif %}
-				</option>
-			{% endfor %}
-		</select>
-	</div>
+    <!-- Filtre caméra -->
+    <div class="col-md-4">
+        <label class="form-label">Caméra</label>
+        <select name="camera" class="form-select">
+            <option value="">Toutes les caméras</option>
+            {% for c in Cameras %}
+                <option value="{{ c.mac }}"
+                    {% if selected_camera == c.mac %}selected{% endif %}>
+                    {{ c.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
 
     <!-- Filtre date début -->
     <div class="col-md-3">
@@ -97,15 +99,14 @@
                     <i class="fa fa-trash"></i>
                 </button>
             </form>
-            
-           
-			<a bref="{{ url_for('show_image' , photo_id=p.id) }}" target="_blank">
-				<img src="{{ url_for('show_image',photo_id=p.id) }}" alt="Image">
-			</a>	
-			<div class="mt-2 text-center">
-                <div><strong>Caméra :</strong> {% if p.CameraName == "" or p.CameraName is none %}caméra sans nom ({{p.CameraMac}}){% else %}{{ p.CameraName }}{% endif %}</div>
+
+            <a href="{{ url_for('show_image', photo_id=p.id) }}" target="_blank">
+                <img src="{{ url_for('show_image', photo_id=p.id) }}" alt="Image">
+            </a>
+            <div class="mt-2 text-center">
+                <div><strong>Caméra :</strong> {{ p.CameraName }}</div>
                 <div><strong>Date :</strong> {{ p.Time }}</div>
-            </div>	
+            </div>
         </div>
     {% endfor %}
 

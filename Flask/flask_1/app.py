@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for ,send_file
+from datetime import datetime, timedelta
 from urllib.parse import unquote
 import mariadb
 import os
@@ -28,63 +29,26 @@ def index():
     conn = get_db()
     cur = conn.cursor()
 
-    # --- Récupérer la liste des caméras ---
-    cur.execute("SELECT DemiMac, NomPersonalise FROM Camera ORDER BY NomPersonalise ASC")
-    Cameras = [{"mac": r[0], "name": r[1]} for r in cur.fetchall()]
-
-    # --- Lire les filtres ---
-    selected_camera = request.args.get("camera", "")
-    date_start = request.args.get("start", "")
-    date_end = request.args.get("end", "")
-
-    # --- Construire la requéte dynamique ---
-    query = """
-        SELECT Image.id, Image.Data, Image.Time, Camera.NomPersonalise, Camera.DemiMac
-        FROM Image
-        LEFT JOIN Camera ON Camera.DemiMac = Image.CameraDemiMac
-        WHERE 1=1
-    """
-    params = []
-
-    if selected_camera:
-        query += " AND Image.CameraDemiMac = ?"
-        params.append(selected_camera)
-
-    if date_start:
-        query += " AND Image.Time >= ?"
-        params.append(date_start + " 00:00:00")
-
-    if date_end:
-        query += " AND Image.Time <= ?"
-        params.append(date_end + " 23:59:59")
-
-    query += " ORDER BY Image.Time DESC"
-
-    cur.execute(query, params)
-
+    cur.execute("""
+    SELECT Image.id, Image.Data, Image.Time, Camera.NomPersonalise
+    FROM Image
+    LEFT JOIN Camera ON Camera.DemiMac = Image.CameraDemiMac
+    ORDER BY Image.Time DESC
+""")
     Images = [
-        {
-            "id": row[0],
-            "Data": row[1],
-            "Time": row[2],
-            "CameraName": row[3],
-            "CameraMac": row[4]
-            
-        }
-        for row in cur.fetchall()
-    ]
+    {
+        "id": row[0],
+        "Data": row[1],
+        "Time": row[2],
+        "CameraName": row[3] or "Caméra inconnue"
+    }
+    for row in cur.fetchall()
+]
 
     cur.close()
     conn.close()
 
-    return render_template(
-        "index.html",
-        Images=Images,
-        Cameras=Cameras,
-        selected_camera=selected_camera,
-        date_start=date_start,
-        date_end=date_end
-    )
+    return render_template("index.html", Images=Images)
     
 # -----------------------------
 # Suppression d'une image
@@ -164,6 +128,86 @@ def batterie():
         times_json=json.dumps(times),
         values_json=json.dumps(values)
     )
+
+# -----------------------------
+# Page Caméras
+# -----------------------------
+@app.route("/cameras", methods=["GET", "POST"])
+def cameras():
+    conn = get_db()
+    cur = conn.cursor()
+
+    # ---- Renommage ----
+    if request.method == "POST":
+        mac = request.form.get("mac")
+        new_name = request.form.get("new_name")
+        cur.execute("UPDATE Camera SET NomPersonalise = ? WHERE DemiMac = ?", (new_name, mac))
+        conn.commit()
+
+    # ---- Liste des caméras ----
+    cur.execute("SELECT DemiMac, NomPersonalise FROM Camera")
+    cameras_raw = cur.fetchall()
+
+    cameras = []
+
+    for mac, name in cameras_raw:
+
+        # -------- Compter les photos --------
+        cur.execute("SELECT COUNT(*) FROM Image WHERE CameraDemiMac = ?", (mac,))
+        img_count = cur.fetchone()[0]
+
+        # -------- Derniére image --------
+        cur.execute("""
+            SELECT Time
+            FROM Image
+            WHERE CameraDemiMac = ?
+            ORDER BY Time DESC
+            LIMIT 1
+        """, (mac,))
+        last_image = cur.fetchone()
+        last_image_time = last_image[0] if last_image else None
+
+        # -------- Dernier message batterie --------
+        cur.execute("""
+            SELECT Time
+            FROM Batterie
+            WHERE CameraDemiMac = ?
+            ORDER BY Time DESC
+            LIMIT 1
+        """, (mac,))
+        last_batt = cur.fetchone()
+        last_batt_time = last_batt[0] if last_batt else None
+
+        # -------- Dernier message global --------
+        times = [t for t in (last_image_time, last_batt_time) if t is not None]
+
+        if times:
+            last_msg = max(times)        
+        else:
+            last_msg = None
+
+        # -------- Déterminer l'état --------
+        if last_msg:
+
+            if isinstance(last_msg, str):
+                last_msg = datetime.fromisoformat(last_msg)
+
+            is_ok = (datetime.now() - last_msg) <= timedelta(hours=24)
+        else:
+            is_ok = False
+
+        cameras.append({
+            "mac": mac,
+            "name": name,
+            "count": img_count,
+            "etat": is_ok,           # True = vert, False = rouge
+            "etat_time": last_msg    # date du dernier message
+        })
+
+    cur.close()
+    conn.close()
+
+    return render_template("cameras.html", cameras=cameras)
 # -----------------------------
 # Lancement : seulement local
 # -----------------------------
