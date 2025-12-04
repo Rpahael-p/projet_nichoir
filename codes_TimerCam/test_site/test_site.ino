@@ -23,23 +23,26 @@ WebServer server(80);
 
 Preferences prefs;
 
-const char* htmlForm = R"rawliteral(
+const char* htmlFormHeader = R"rawliteral(
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>TimerCam Configuration</title>
-    </head>
-    <body>
-        <h2>Connect your Timercam to your Wi-Fi</h2>
-        <form action="/connecting" method="POST">
-            SSID: <input type="text" name="ssid"><br><br>
-            Password: <input type="text" name="password"><br><br>
-            <input type="submit" value="Connect">
-        </form>
-        <p>After submitting, you will be redirected to a status page.<br>
-        If the connection fails, you will return to this configuration page.<br>
-        If successful, this access point will shut down and the configuration portal will close.</p>    
-    </body>
+<head><title>TimerCam Configuration</title></head>
+<body>
+<h2>Connect your Timercam to your Wi-Fi</h2>
+<form action="/connecting" method="POST">
+SSID: 
+<select name="ssid">
+)rawliteral";
+
+const char* htmlFormFooter = R"rawliteral(
+</select><br><br>
+Password: <input type="text" name="password"><br><br>
+<input type="submit" value="Connect">
+</form>
+<p>After submitting, you will be redirected to a status page.<br>
+If the connection fails, you will return to this configuration page.<br>
+If successful, this access point will shut down and the configuration portal will close.</p>
+</body>
 </html>
 )rawliteral";
 
@@ -47,13 +50,13 @@ const char* htmlConnecting = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Connection to your Wi-Fi</title>
-    <meta http-equiv="refresh" content="10; URL=/" />
+<title>Connection to your Wi-Fi</title>
+<meta http-equiv="refresh" content="10; URL=/" />
 </head>
 <body>
-    <h2>Connecting to your network...</h2>
-    <p>If the connection fails, you will be redirected back to the configuration page.</p>    
-    <p>If the connection succeeds, the access point will shut down and this configuration portal will close.</p>  
+<h2>Connecting to your network...</h2>
+<p>If the connection fails, you will be redirected back to the configuration page.</p>
+<p>If the connection succeeds, the access point will shut down and this configuration portal will close.</p>
 </body>
 </html>
 )rawliteral";
@@ -81,7 +84,24 @@ bool is_stored_prefs_same() {
 }
 
 void handleRoot() {
-    server.send(200, "text/html", htmlForm);
+    int n = WiFi.scanNetworks();
+
+    String options = "";
+
+    if (n == 0) {
+        options = "<option>No WiFi found</option>";
+    } else {
+        for (int i = 0; i < n; i++) {
+            options += "<option value='" + WiFi.SSID(i) + "'>" + WiFi.SSID(i) + "</option>";
+        }
+    }
+
+    WiFi.scanDelete();
+
+    // 🔵 Construire la page HTML complète
+    String fullPage = String(htmlFormHeader) + options + String(htmlFormFooter);
+
+    server.send(200, "text/html", fullPage);
 }
 
 void handleConnecting() {
@@ -101,10 +121,10 @@ void handleConnecting() {
         server.send(200, "text/html", htmlConnecting);
 
         return;
-    }
+    };
 
     // GET → on affiche la page
-    server.send(200, "text/html", htmlForm);
+    handleRoot();
 }
 
 void start_ap() {
