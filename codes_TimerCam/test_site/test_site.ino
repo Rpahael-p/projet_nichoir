@@ -26,22 +26,82 @@ Preferences prefs;
 const char* htmlFormHeader = R"rawliteral(
 <!DOCTYPE html>
 <html>
-<head><title>TimerCam Configuration</title></head>
+<head>
+<title>TimerCam Configuration</title>
+<style>
+    body {
+        background: #f2f2f2;
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+    }
+
+    .card {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        width: 320px;
+        text-align: center;
+    }
+
+    h2 {
+        margin-top: 0;
+        color: #333;
+    }
+
+    select, input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 6px;
+        border: 1px solid #aaa;
+        font-size: 14px;
+    }
+
+    input[type="submit"] {
+        margin-top: 20px;
+        width: 100%;
+        padding: 12px;
+        background: #0078ff;
+        color: white;
+        font-size: 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    input[type="submit"]:hover {
+        background: #005fcc;
+    }
+
+    p {
+        color: #666;
+        font-size: 12px;
+        margin-top: 15px;
+    }
+</style>
+</head>
 <body>
-<h2>Connect your Timercam to your Wi-Fi</h2>
+<div class="card">
+<h2>Wi-Fi Setup</h2>
 <form action="/connecting" method="POST">
-SSID: 
+SSID:
 <select name="ssid">
 )rawliteral";
 
 const char* htmlFormFooter = R"rawliteral(
-</select><br><br>
-Password: <input type="text" name="password"><br><br>
+</select>
+<br>
+Password:
+<input type="text" name="password">
 <input type="submit" value="Connect">
 </form>
-<p>After submitting, you will be redirected to a status page.<br>
-If the connection fails, you will return to this configuration page.<br>
-If successful, this access point will shut down and the configuration portal will close.</p>
+<p>After submitting, the device will try to connect to your Wi-Fi.</p>
+</div>
 </body>
 </html>
 )rawliteral";
@@ -50,16 +110,46 @@ const char* htmlConnecting = R"rawliteral(
 <!DOCTYPE html>
 <html>
 <head>
-<title>Connection to your Wi-Fi</title>
+<title>Connecting…</title>
 <meta http-equiv="refresh" content="10; URL=/" />
+<style>
+    body {
+        background: #f2f2f2;
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+    }
+    .card {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        width: 320px;
+        text-align: center;
+    }
+    h2 {
+        margin-top: 0;
+        color: #333;
+    }
+    p {
+        color: #666;
+        font-size: 14px;
+    }
+</style>
 </head>
 <body>
-<h2>Connecting to your network...</h2>
-<p>If the connection fails, you will be redirected back to the configuration page.</p>
-<p>If the connection succeeds, the access point will shut down and this configuration portal will close.</p>
+<div class="card">
+<h2>Connecting…</h2>
+<p>The device is trying to connect to your Wi-Fi.</p>
+<p>If it fails, you will return to the configuration page.</p>
+</div>
 </body>
 </html>
 )rawliteral";
+
 
 void get_wifi_prefs() {
     prefs.begin("config", false);
