@@ -29,27 +29,61 @@ def index():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-    SELECT Image.id, Image.Data, Image.Time, Camera.NomPersonalise
-    FROM Image
-    LEFT JOIN Camera ON Camera.DemiMac = Image.CameraDemiMac
-    ORDER BY Image.Time DESC
-""")
+    # --- Récupérer la liste des caméras ---
+    cur.execute("SELECT DemiMac, NomPersonalise FROM Camera ORDER BY NomPersonalise ASC")
+    Cameras = [{"mac": r[0], "name": r[1]} for r in cur.fetchall()]
+
+    # --- Lire les filtres ---
+    selected_camera = request.args.get("camera", "")
+    date_start = request.args.get("start", "")
+    date_end = request.args.get("end", "")
+
+    # --- Construire la requéte dynamique ---
+    query = """
+        SELECT Image.id, Image.Data, Image.Time, Camera.NomPersonalise
+        FROM Image
+        LEFT JOIN Camera ON Camera.DemiMac = Image.CameraDemiMac
+        WHERE 1=1
+    """
+    params = []
+
+    if selected_camera:
+        query += " AND Image.CameraDemiMac = ?"
+        params.append(selected_camera)
+
+    if date_start:
+        query += " AND Image.Time >= ?"
+        params.append(date_start + " 00:00:00")
+
+    if date_end:
+        query += " AND Image.Time <= ?"
+        params.append(date_end + " 23:59:59")
+
+    query += " ORDER BY Image.Time DESC"
+
+    cur.execute(query, params)
+
     Images = [
-    {
-        "id": row[0],
-        "Data": row[1],
-        "Time": row[2],
-        "CameraName": row[3] or "Caméra inconnue"
-    }
-    for row in cur.fetchall()
-]
+        {
+            "id": row[0],
+            "Data": row[1],
+            "Time": row[2],
+            "CameraName": row[3] or "Caméra inconnue"
+        }
+        for row in cur.fetchall()
+    ]
 
     cur.close()
     conn.close()
 
-    return render_template("index.html", Images=Images)
-    
+    return render_template(
+        "index.html",
+        Images=Images,
+        Cameras=Cameras,
+        selected_camera=selected_camera,
+        date_start=date_start,
+        date_end=date_end
+    )
 # -----------------------------
 # Suppression d'une image
 # -----------------------------
@@ -108,23 +142,37 @@ def delete_Image(Image_id):
 # -----------------------------
 import json
 
-@app.route("/batterie")
+@app.route("/batterie", methods=["GET"])
 def batterie():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT time, data FROM Batterie ORDER BY time ASC")
-    rows = cur.fetchall()
+    # Récupérer toutes les caméras pour le menu déroulant
+    cur.execute("SELECT DemiMac, NomPersonalise FROM Camera ORDER BY NomPersonalise ASC")
+    cameras_raw = cur.fetchall()
+    cameras = []
+    for mac, name in cameras_raw:
+        display_name = name if name else f"Caméra sans nom ({mac})"
+        cameras.append({"mac": mac, "name": display_name})
 
-    times = [str(r[0]) for r in rows]
-    values = [r[1] for r in rows]
+    # Récupérer la caméra sélectionnée depuis le menu
+    selected_camera = request.args.get("camera", "")
+    times = []
+    values = []
+
+    if selected_camera:
+        cur.execute("SELECT time, data FROM Batterie WHERE CameraDemiMac = ? ORDER BY time ASC", (selected_camera,))
+        rows = cur.fetchall()
+        times = [str(r[0]) for r in rows]
+        values = [r[1] for r in rows]
 
     cur.close()
     conn.close()
 
-    # Convertir en vrais tableaux JSON pour JS
     return render_template(
         "batterie.html",
+        cameras=cameras,
+        selected_camera=selected_camera,
         times_json=json.dumps(times),
         values_json=json.dumps(values)
     )
@@ -213,6 +261,6 @@ def cameras():
 # -----------------------------
 if __name__ == "__main__":
     # Bind sur IP locale du Raspberry
-    app.run(port=5000, debug=True)
+    app.run(host='0.0.0.0',port=5000)
 
     print(os.listdir("templates"))
