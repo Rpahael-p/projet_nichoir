@@ -46,10 +46,11 @@ String mqtt_topic_batterie   = "/batterie";
 
 WiFiClient espClient;                               // Create Wi-Fi client for MQTT
 PubSubClient mqttClient(espClient);                 // Create MQTT client using espClient
-uint16_t max_size = 65536;                           // Maximum MQTT message buffer size
+uint16_t max_size = 8192;                           // Maximum MQTT message buffer size
 
 
 bool go_to_sleep = false;
+bool PIR_state_itr = LOW;
 
 WebServer server(80);
 Preferences prefs;
@@ -104,9 +105,9 @@ const char* htmlFormHeader = R"rawliteral(
 		box-sizing: border-box;
 	}
 
-    select {    /*bottom margin to select*/
+	select {    /*bottom margin to select*/
 		margin-bottom: 10px;
-    }
+	}
 
 	input[type="submit"] {  /*Conenct button style*/
 		margin-top: 20px;
@@ -130,7 +131,7 @@ const char* htmlFormHeader = R"rawliteral(
 		margin-top: 15px;
 	}
 
-    .advanced-toggle {  /*invisible checkbox*/
+	.advanced-toggle {  /*invisible checkbox*/
 		display: none;
 	}
 
@@ -163,7 +164,7 @@ const char* htmlFormHeader = R"rawliteral(
 		margin-top: 15px;
 	}
 
-    .advanced-toggle:checked ~ .advanced-header .arrow {    /*rotate the arrow when checked*/
+	.advanced-toggle:checked ~ .advanced-header .arrow {    /*rotate the arrow when checked*/
 		transform: rotate(90deg);
 	}
 
@@ -189,40 +190,32 @@ Password:
 	<span class="arrow">></span>
 </label>
 <div class="advanced-content">
-    <div class="advanced-box">
+	<div class="advanced-box">
 		<label>Resolution</label>
-		<select name="Resolution">
+		<select name="resolution">
 			<option value="0">96x96</option>
 			<option value="1">160x120 (QQVGA)</option>
 			<option value="2">128x128</option>
 			<option value="3">176x144 (QCIF)</option>
 			<option value="4">240x176 (HQVGA)</option>
 			<option value="5">240x240</option>
-			<option value="6" selected>320x240 (QVGA)</option>
-			<option value="7">320x320</option>
+			<option value="6">320x240 (QVGA)</option>
+			<option value="7"selected>320x320</option>
 			<option value="8">400x296 (CIF)</option>
 			<option value="9">480x320 (HVGA)</option>
 			<option value="10">640x480 (VGA)</option>
-			/*<option value="11">800x600 (SVGA)</option>*/
+			<option value="11">800x600 (SVGA)</option>
 			<option value="12">1024x768 (XGA)</option>
 			<option value="13">1280x720 (HD)</option>
 			<option value="14">1280x1024 (SXGA)</option>
 			<option value="15">1600x1200 (UXGA)</option>
 			<option value="16">1920x1080 (FHD)</option>
-			<option value="17">720x1280 (P_HD)</option>
-			<option value="18">864x1536 (P_3MP)</option>
-			<option value="19">2048x1536 (QXGA)</option>
-			<option value="20">2560x1440 (QHD)</option>
-			<option value="21">2560x1600 (WQXGA)</option>
-			<option value="22">1080x1920 (P_FHD)</option>
-			<option value="23">2560x1920 (QSXGA)</option>
-			<option value="24">2592x1944 (5MP)</option>
 		</select>
 
 		<label>Photo Attempt (0-10)</label>
 		<input type="number" name="Attempt" min="0" max="10" value="3" step="1">
-		<label>Quality (0-63)</label>
-		<input type="number" name="Brightness" min="0" max="63" value="31" step="1">
+		<label>Quality (63-5)</label>
+		<input type="number" name="Brightness" min="5" max="63" value="31" step="1">
 		<label>Brightness (-2-2)</label>
 		<input type="number" name="Brightness" min="-2" max="2" value="0" step="1">
 		<label>Contrast (-2-2)</label>
@@ -233,13 +226,13 @@ Password:
 		<input type="number" name="Sharpness" min="-2" max="2" value="0" step="1">
 
 		<div class="checkbox-option">
-            <label for="vflip">Vflip</label>
-            <input type="checkbox" id="vflip" name="Vflip" value="1" checked>
-        </div>
-        <div class="checkbox-option">
-            <label for="hmirror">Hmirror</label>
-            <input type="checkbox" id="hmirror" name="Hmirror" value="1">
-        </div>
+			<label for="vflip">Vflip</label>
+			<input type="checkbox" id="vflip" name="Vflip" value="1" checked>
+		</div>
+		<div class="checkbox-option">
+			<label for="hmirror">Hmirror</label>
+			<input type="checkbox" id="hmirror" name="Hmirror" value="1">
+		</div>
 	</div>
 </div>
 
@@ -296,61 +289,61 @@ const char* htmlConnecting = R"rawliteral(
 )rawliteral";
 
 void load_stored_prefs() {
-    prefs.begin("config", true); // true = lecture seule
-    
-    wifi_ssid = prefs.getString("ssid", "None");
-    wifi_password = prefs.getString("mdp", "None");
-    Resolution = prefs.getUChar("Resolution", 6);
-    photo_attempt = prefs.getUChar("Attempt", 3);
-    quality = prefs.getUChar("Quality", 31);
-    brightness = prefs.getUChar("Brightness", 0);
-    contrast = prefs.getUChar("Contrast", 0);
-    saturation = prefs.getUChar("Saturation", 0);
-    sharpness = prefs.getUChar("Sharpness", 0);
-    vflip = prefs.getBool("Vflip", true);
-    hmirror = prefs.getBool("Hmirror", false);
-    
-    prefs.end();
+	prefs.begin("config", true); // true = lecture seule
+	
+	wifi_ssid = prefs.getString("ssid", "None");
+	wifi_password = prefs.getString("mdp", "None");
+	Resolution = prefs.getUChar("Resolution", 6);
+	photo_attempt = prefs.getUChar("Attempt", 3);
+	quality = prefs.getUChar("Quality", 31);
+	brightness = prefs.getUChar("Brightness", 0);
+	contrast = prefs.getUChar("Contrast", 0);
+	saturation = prefs.getUChar("Saturation", 0);
+	sharpness = prefs.getUChar("Sharpness", 0);
+	vflip = prefs.getBool("Vflip", true);
+	hmirror = prefs.getBool("Hmirror", false);
+	
+	prefs.end();
 }
 
 void update_stored_prefs() {
-    prefs.begin("config", false);
-    
-    if (wifi_ssid != prefs.getString("ssid", "None")) {
-        prefs.putString("ssid", wifi_ssid);
-    }
-    if (wifi_password != prefs.getString("mdp", "None")) {
-        prefs.putString("mdp", wifi_password);
-    }
-    if (Resolution != prefs.getUChar("Resolution", 6)) {
-        prefs.putUChar("Resolution", Resolution);
-    }
-    if (photo_attempt != prefs.getUChar("Attempt", 3)) {
-        prefs.putUChar("Attempt", photo_attempt);
-    }
-    if (quality != prefs.getUChar("Quality", 31)) {
-        prefs.putUChar("Quality", quality);
-    }
-    if (brightness != prefs.getUChar("Brightness", 0)) {
-        prefs.putUChar("Brightness", brightness);
-    }
-    if (contrast != prefs.getUChar("Contrast", 0)) {
-        prefs.putUChar("Contrast", contrast);
-    }
-    if (saturation != prefs.getUChar("Saturation", 0)) {
-        prefs.putUChar("Saturation", saturation);
-    }
-    if (sharpness != prefs.getUChar("Sharpness", 0)) {
-        prefs.putUChar("Sharpness", sharpness);
-    }
-    if (vflip != prefs.getBool("Vflip", true)) {
-        prefs.putBool("Vflip", vflip);
-    }
-    if (hmirror != prefs.getBool("Hmirror", false)) {
-        prefs.putBool("Hmirror", hmirror);
-    }
-    
-    prefs.end();
+	prefs.begin("config", false);
+	
+	if (wifi_ssid != prefs.getString("ssid", "None")) {
+		prefs.putString("ssid", wifi_ssid);
+	}
+	if (wifi_password != prefs.getString("mdp", "None")) {
+		prefs.putString("mdp", wifi_password);
+	}
+	if (Resolution != prefs.getUChar("Resolution", 6)) {
+		prefs.putUChar("Resolution", Resolution);
+	}
+	if (photo_attempt != prefs.getUChar("Attempt", 3)) {
+		prefs.putUChar("Attempt", photo_attempt);
+	}
+	if (quality != prefs.getUChar("Quality", 31)) {
+		prefs.putUChar("Quality", quality);
+	}
+	if (brightness != prefs.getUChar("Brightness", 0)) {
+		prefs.putUChar("Brightness", brightness);
+	}
+	if (contrast != prefs.getUChar("Contrast", 0)) {
+		prefs.putUChar("Contrast", contrast);
+	}
+	if (saturation != prefs.getUChar("Saturation", 0)) {
+		prefs.putUChar("Saturation", saturation);
+	}
+	if (sharpness != prefs.getUChar("Sharpness", 0)) {
+		prefs.putUChar("Sharpness", sharpness);
+	}
+	if (vflip != prefs.getBool("Vflip", true)) {
+		prefs.putBool("Vflip", vflip);
+	}
+	if (hmirror != prefs.getBool("Hmirror", false)) {
+		prefs.putBool("Hmirror", hmirror);
+	}
+	
+	prefs.end();
 }
 
 void handleRoot() {
@@ -443,7 +436,7 @@ String getShortID() {
 
 void update_parameters() {
 	TimerCAM.Camera.sensor->set_framesize(TimerCAM.Camera.sensor, (framesize_t) Resolution); 	// Set frame size
-	TimerCAM.Camera.sensor->set_quality(TimerCAM.Camera.sensor, 10); 	// Set frame size
+	TimerCAM.Camera.sensor->set_quality(TimerCAM.Camera.sensor, 5); 	// Set frame size
 
 	TimerCAM.Camera.sensor->set_brightness(TimerCAM.Camera.sensor, brightness); 	// Set frame size
 	TimerCAM.Camera.sensor->set_contrast(TimerCAM.Camera.sensor, contrast); 	// Set frame size
@@ -467,16 +460,7 @@ void setup_camera() {
 void setup() {
 	// Setup of the TimerCam
 	TimerCAM.begin(true);
-	// TimerCAM.Power.setLed(128);
-	delay(200);
-	
-
-
-	// Setup of the deep sleep
-	gpio_hold_en((gpio_num_t)POWER_HOLD_PIN);
-	gpio_deep_sleep_hold_en();
-	esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 1);  // 1 = High, 0 = Low
-
+	delay(50);
 	esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
 	if (cause == ESP_SLEEP_WAKEUP_GPIO) {
 		Serial.println("Wake up by GPIO");
@@ -498,6 +482,27 @@ void setup() {
 		Serial.print("Wake up from unknown cause: ");
 		Serial.println((int)cause);
 	}
+
+	pinMode(CAM_EXT_WAKEUP_PIN, INPUT);
+	bool level = digitalRead(CAM_EXT_WAKEUP_PIN);
+	Serial.print("level = "); Serial.println(level);
+	if (cause == ESP_SLEEP_WAKEUP_EXT0) {
+		if (level) {
+			esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 0);
+		} else {
+			esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 1);  // 1 = High, 0 = Low
+			esp_deep_sleep_start();
+		}
+	} else if (cause == ESP_SLEEP_WAKEUP_UNDEFINED) {
+		esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 1);
+	}
+	// TimerCAM.Power.setLed(128);
+	delay(100);
+
+	// Setup of the deep sleep
+	gpio_deep_sleep_hold_en();
+	gpio_hold_en((gpio_num_t)POWER_HOLD_PIN);
+
 
 	// Setup MQTT
 	mqttClient.setServer(mqtt_server, mqtt_port); // Set MQTT server and port
@@ -541,7 +546,8 @@ void loop() {
 		TimerCAM.Power.setLed(0);
 
 		// TimerCAM.Rtc.setAlarmIRQ(15);
-		esp_sleep_enable_timer_wakeup(20* 1000000);
+		// esp_sleep_enable_timer_wakeup(20* 1000000);
+		gpio_hold_en((gpio_num_t) CAM_EXT_WAKEUP_PIN);
 		esp_deep_sleep_start();
 		return;
 	}
@@ -589,43 +595,69 @@ void loop() {
 void sendPhotoMQTT() {                              // Function to capture and send photo
 	// Try to connect to MQTT
 	mqttClient.connect("TimerCamClient", "esp32", "nichoir");
-	delay(250);
+	delay(100);
 	if (!mqttClient.connected()) {                  // Check MQTT connection
 		Serial.print("Failed, rc=");            // Print error code
 		Serial.print(mqttClient.state());
 		delay(2000);                            // Wait before retrying
 		return;
 	}
-	TimerCAM.Camera.free();                              // Free camera buffer
-	delay(100);
+
 	if (!TimerCAM.Camera.get()) {                   // Capture image
 		Serial.println("Failed to capture image");  // Print error if capture fails
 		return;
 	}
+
 	Serial.printf("Photo captured, size: %d bytes\n", TimerCAM.Camera.fb->len); // Print image size
 
 	// mqttClient.publish(mqtt_topic_text, "Message from TimerCam"); // Send text message
 
 	String batterie = String(esp_random() % 100);
-	Serial.println(batterie.c_str());
 	String BatterieTopic = mqtt_topic_start + getShortID() + mqtt_topic_batterie;
-	Serial.println(BatterieTopic.c_str());
-	String PhotoTopic = mqtt_topic_start + getShortID() + mqtt_topic_photo;
-	Serial.println(PhotoTopic.c_str());
+	String PhotoBaseTopic = mqtt_topic_start + getShortID() + mqtt_topic_photo;
 
-	mqttClient.publish("test", "test");
+	mqttClient.publish(BatterieTopic.c_str(), batterie.c_str());
+	
+	const size_t CHUNK_SIZE = 4096;
 
-	bool sent_batterie = mqttClient.publish(BatterieTopic.c_str(), batterie.c_str()); // Send text message
-	bool sent_photo = mqttClient.publish(PhotoTopic.c_str(), TimerCAM.Camera.fb->buf, TimerCAM.Camera.fb->len, false); // Send photo
+	size_t img_len = TimerCAM.Camera.fb->len;
+	uint8_t* img_buf = TimerCAM.Camera.fb->buf;
+
+	int chunkIndex = 0;
+	bool sent;
+
+	for (size_t offset = 0; offset < img_len; offset += CHUNK_SIZE) {
+
+		size_t chunkLen = min(CHUNK_SIZE, img_len - offset);
+		String chunkTopic = PhotoBaseTopic + "/" + String(chunkIndex);
+
+		sent = mqttClient.publish(
+			chunkTopic.c_str(),
+			img_buf + offset,
+			chunkLen,
+			false
+		);
+
+		if (!sent) {
+			Serial.println("Failed to send chunk");
+			break;
+		}
+
+		chunkIndex++;
+		mqttClient.loop();
+		delay(10);
+	}
+
+	mqttClient.publish((PhotoBaseTopic + "/end").c_str(), "");
 	
 	TimerCAM.Camera.free();                              // Free camera buffer
 
 	unsigned long start_loop = millis();
-	while (mqttClient.connected() && millis() - start_loop < 2000) {
+	while (mqttClient.connected() && millis() - start_loop < 1000) {
 		mqttClient.loop();
 	}
 
-	if (sent_photo) {                                // Check if photo sent successfully
+	if (sent) {                                // Check if photo sent successfully
 		Serial.printf("Photo sent via MQTT, size: %d bytes\n", TimerCAM.Camera.fb->len);
 		go_to_sleep = true;
 		WiFi.disconnect();
