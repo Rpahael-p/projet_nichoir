@@ -50,7 +50,6 @@ uint16_t max_size = 8192;                           // Maximum MQTT message buff
 
 
 bool go_to_sleep = false;
-bool PIR_state_itr = LOW;
 
 WebServer server(80);
 Preferences prefs;
@@ -461,6 +460,7 @@ void setup() {
 	// Setup of the TimerCam
 	TimerCAM.begin(true);
 	delay(50);
+
 	esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
 	if (cause == ESP_SLEEP_WAKEUP_GPIO) {
 		Serial.println("Wake up by GPIO");
@@ -483,26 +483,12 @@ void setup() {
 		Serial.println((int)cause);
 	}
 
-	pinMode(CAM_EXT_WAKEUP_PIN, INPUT);
-	bool level = digitalRead(CAM_EXT_WAKEUP_PIN);
-	Serial.print("level = "); Serial.println(level);
-	if (cause == ESP_SLEEP_WAKEUP_EXT0) {
-		if (level) {
-			esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 0);
-		} else {
-			esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 1);  // 1 = High, 0 = Low
-			esp_deep_sleep_start();
-		}
-	} else if (cause == ESP_SLEEP_WAKEUP_UNDEFINED) {
-		esp_sleep_enable_ext0_wakeup((gpio_num_t) CAM_EXT_WAKEUP_PIN, 1);
-	}
-	// TimerCAM.Power.setLed(128);
-	delay(100);
-
 	// Setup of the deep sleep
 	gpio_deep_sleep_hold_en();
 	gpio_hold_en((gpio_num_t)POWER_HOLD_PIN);
-
+	pinMode(CAM_EXT_WAKEUP_PIN, INPUT_PULLDOWN); //INPUT_PULLDOWN
+	gpio_hold_en((gpio_num_t)CAM_EXT_WAKEUP_PIN);
+	esp_sleep_enable_ext0_wakeup((gpio_num_t)CAM_EXT_WAKEUP_PIN, 1);
 
 	// Setup MQTT
 	mqttClient.setServer(mqtt_server, mqtt_port); // Set MQTT server and port
@@ -545,9 +531,7 @@ void loop() {
 		ticker.detach();
 		TimerCAM.Power.setLed(0);
 
-		// TimerCAM.Rtc.setAlarmIRQ(15);
 		// esp_sleep_enable_timer_wakeup(20* 1000000);
-		gpio_hold_en((gpio_num_t) CAM_EXT_WAKEUP_PIN);
 		esp_deep_sleep_start();
 		return;
 	}
