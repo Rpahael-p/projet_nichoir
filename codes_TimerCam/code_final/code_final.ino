@@ -33,16 +33,17 @@ volatile uint8_t led_pwm = 0;
 int n = 0; // nombre de wifi
 
 /////////////// MQTT /////////////////
-// const char* mqtt_server       = "192.168.2.51";     // MQTT broker IP address PI
-// const char* mqtt_server       = "10.42.0.1";     // MQTT broker IP address PI
-const char* mqtt_server       = "192.168.2.31";     // MQTT broker IP address PC ecole
-// const char* mqtt_server       = "192.168.1.58";     // MQTT broker IP address PC maiso,
+const char* mqtt_server       = "192.168.0.50";     // MQTT broker IP address
 const int   mqtt_port         = 1883;               // MQTT port (default 1883)
 
 String mqtt_topic_start = "TimerCam/";
 String mqtt_topic_photo   = "/photo";
 String mqtt_topic_batterie   = "/batterie";
 
+bool photo_sent = false;
+bool battery_sent = false;
+
+uint8_t battery_interval = 24;						// Max battery info interval in hours
 
 WiFiClient espClient;                               // Create Wi-Fi client for MQTT
 PubSubClient mqttClient(espClient);                 // Create MQTT client using espClient
@@ -56,13 +57,12 @@ Preferences prefs;
 uint8_t Resolution;
 uint8_t photo_attempt;
 uint8_t quality;
-uint8_t brightness;
-uint8_t contrast;
-uint8_t saturation;
-uint8_t sharpness;
+int8_t brightness;
+int8_t contrast;
+int8_t saturation;
+int8_t sharpness;
 bool vflip;
 bool hmirror;
-
 
 const char* htmlFormHeader = R"rawliteral(
 <!DOCTYPE html>
@@ -212,17 +212,17 @@ Password:
 		</select>
 
 		<label>Photo Attempt (0-10)</label>
-		<input type="number" name="Attempt" min="0" max="10" value="3" step="1">
-		<label>Quality (63-5)</label>
-		<input type="number" name="Brightness" min="5" max="63" value="31" step="1">
+		<input type="text" inputmode="numeric" name="Attempt" min="1" max="10" value="3" step="1" required>
+		<label>Quality (63-2)</label>
+		<input type="text" inputmode="numeric" name="Quality" min="2" max="63" value="31" step="1" required>
 		<label>Brightness (-2-2)</label>
-		<input type="number" name="Brightness" min="-2" max="2" value="0" step="1">
+		<input type="text" inputmode="numeric" name="Brightness" min="-2" max="2" value="0" step="1" required>
 		<label>Contrast (-2-2)</label>
-		<input type="number" name="Contrast" min="-2" max="2" value="0" step="1">
+		<input type="text" inputmode="numeric" name="Contrast" min="-2" max="2" value="0" step="1" required>
 		<label>Saturation (-2-2)</label>
-		<input type="number" name="Saturation" min="-2" max="2" value="0" step="1">
+		<input type="text" inputmode="numeric" name="Saturation" min="-2" max="2" value="0" step="1" required>
 		<label>Sharpness (-2-2)</label>
-		<input type="number" name="Sharpness" min="-2" max="2" value="0" step="1">
+		<input type="text" inputmode="numeric" name="Sharpness" min="-2" max="2" value="0" step="1" required>
 
 		<div class="checkbox-option">
 			<label for="vflip">Vflip</label>
@@ -295,10 +295,10 @@ void load_stored_prefs() {
 	Resolution = prefs.getUChar("Resolution", 6);
 	photo_attempt = prefs.getUChar("Attempt", 3);
 	quality = prefs.getUChar("Quality", 31);
-	brightness = prefs.getUChar("Brightness", 0);
-	contrast = prefs.getUChar("Contrast", 0);
-	saturation = prefs.getUChar("Saturation", 0);
-	sharpness = prefs.getUChar("Sharpness", 0);
+	brightness = prefs.getChar("Brightness", 0);
+	contrast = prefs.getChar("Contrast", 0);
+	saturation = prefs.getChar("Saturation", 0);
+	sharpness = prefs.getChar("Sharpness", 0);
 	vflip = prefs.getBool("Vflip", true);
 	hmirror = prefs.getBool("Hmirror", false);
 	
@@ -363,7 +363,7 @@ void handleConnecting() {
 	if (server.method() == HTTP_POST) {
 		wifi_ssid = server.arg("ssid");
 		wifi_password = server.arg("password");
-		Resolution = server.arg("Resolution").toInt();
+		Resolution = server.arg("resolution").toInt();
 		photo_attempt = server.arg("Attempt").toInt();
 		quality = server.arg("Quality").toInt();
 		brightness = server.arg("Brightness").toInt();
@@ -435,12 +435,12 @@ String getShortID() {
 
 void update_parameters() {
 	TimerCAM.Camera.sensor->set_framesize(TimerCAM.Camera.sensor, (framesize_t) Resolution); 	// Set frame size
-	TimerCAM.Camera.sensor->set_quality(TimerCAM.Camera.sensor, 5); 	// Set frame size
+	TimerCAM.Camera.sensor->set_quality(TimerCAM.Camera.sensor, quality);
 
-	TimerCAM.Camera.sensor->set_brightness(TimerCAM.Camera.sensor, brightness); 	// Set frame size
-	TimerCAM.Camera.sensor->set_contrast(TimerCAM.Camera.sensor, contrast); 	// Set frame size
-	TimerCAM.Camera.sensor->set_saturation(TimerCAM.Camera.sensor, saturation); 	// Set frame size
-	TimerCAM.Camera.sensor->set_sharpness(TimerCAM.Camera.sensor, sharpness); 	// Set frame size
+	TimerCAM.Camera.sensor->set_brightness(TimerCAM.Camera.sensor, brightness);
+	TimerCAM.Camera.sensor->set_contrast(TimerCAM.Camera.sensor, contrast);
+	TimerCAM.Camera.sensor->set_saturation(TimerCAM.Camera.sensor, saturation);
+	TimerCAM.Camera.sensor->set_sharpness(TimerCAM.Camera.sensor, sharpness);
 	TimerCAM.Camera.sensor->set_vflip(TimerCAM.Camera.sensor, vflip);               // Vertical flip
 	TimerCAM.Camera.sensor->set_hmirror(TimerCAM.Camera.sensor, hmirror);             // Horizontal mirror
 }
@@ -531,15 +531,10 @@ void loop() {
 		ticker.detach();
 		TimerCAM.Power.setLed(0);
 
-		// esp_sleep_enable_timer_wakeup(20* 1000000);
 		esp_deep_sleep_start();
 		return;
 	}
 	if (WiFi.status() == WL_CONNECTED) {
-		photo_attempt -= 1;
-		// if (connected_timestamp == 0) {
-		// 	connected_timestamp = millis();
-		// }
 		TimerCAM.Power.setLed(255);
 		if (AP) {
 			stop_ap();
@@ -547,8 +542,6 @@ void loop() {
 		}
 		Serial.println("Connected to Wi-Fi!");
 		ticker.detach();
-		// Serial.println(millis() - connected_timestamp);
-		// if (millis() - connected_timestamp > 10000) {
 		Serial.print("attempt left : "); Serial.println(photo_attempt);
 		if (photo_attempt < 1) {
 			Serial.println("Timeout connected");
@@ -557,8 +550,8 @@ void loop() {
 			WiFi.disconnect();
 			return;
 		}
-		// wait release?
-		sendPhotoMQTT();
+		photo_attempt -= 1;
+		send_data();
 	} else if (connecting) {
 		if (millis() - start_connecting > connect_timeout) {
 			Serial.println("timeout not connected");
@@ -576,17 +569,45 @@ void loop() {
 	delay(50);
 }
 
-void sendPhotoMQTT() {                              // Function to capture and send photo
+void send_data() {
 	// Try to connect to MQTT
+	if (!MQTT_connection()) {
+		Serial.println("mqtt connection failed");
+		return;
+	}
+	
+	esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+	if (cause != ESP_SLEEP_WAKEUP_TIMER) {
+		if (!photo_sent) {
+			sendPhotoMQTT();
+		}
+	}
+
+	if (!battery_sent) {
+		sendBatteryInfo();
+	}
+
+	if (photo_sent && battery_sent) {                                // Check if photo and battery level sent successfully
+		go_to_sleep = true;
+		WiFi.disconnect();
+	} else {
+		Serial.println("Failed to send photo or battery via MQTT"); // Print error if failed
+	}
+}
+
+bool MQTT_connection() {
 	mqttClient.connect("TimerCamClient", "esp32", "nichoir");
 	delay(100);
 	if (!mqttClient.connected()) {                  // Check MQTT connection
 		Serial.print("Failed, rc=");            // Print error code
-		Serial.print(mqttClient.state());
+		Serial.println(mqttClient.state());
 		delay(2000);                            // Wait before retrying
-		return;
+		return false;
 	}
+	return true;
+}
 
+void sendPhotoMQTT() {                              // Function to capture and send photo
 	if (!TimerCAM.Camera.get()) {                   // Capture image
 		Serial.println("Failed to capture image");  // Print error if capture fails
 		return;
@@ -594,13 +615,7 @@ void sendPhotoMQTT() {                              // Function to capture and s
 
 	Serial.printf("Photo captured, size: %d bytes\n", TimerCAM.Camera.fb->len); // Print image size
 
-	// mqttClient.publish(mqtt_topic_text, "Message from TimerCam"); // Send text message
-
-	String batterie = String(esp_random() % 100);
-	String BatterieTopic = mqtt_topic_start + getShortID() + mqtt_topic_batterie;
 	String PhotoBaseTopic = mqtt_topic_start + getShortID() + mqtt_topic_photo;
-
-	mqttClient.publish(BatterieTopic.c_str(), batterie.c_str());
 	
 	const size_t CHUNK_SIZE = 4096;
 
@@ -632,21 +647,36 @@ void sendPhotoMQTT() {                              // Function to capture and s
 		delay(10);
 	}
 
+	photo_sent = sent;
+
 	mqttClient.publish((PhotoBaseTopic + "/end").c_str(), "");
+	
+	if (photo_sent) {
+		Serial.printf("Photo sent via MQTT, size: %d bytes", img_len);
+	}
 	
 	TimerCAM.Camera.free();                              // Free camera buffer
 
+	// needed ?
 	unsigned long start_loop = millis();
 	while (mqttClient.connected() && millis() - start_loop < 1000) {
 		mqttClient.loop();
 	}
+}
 
-	if (sent) {                                // Check if photo sent successfully
-		Serial.printf("Photo sent via MQTT, size: %d bytes\n", TimerCAM.Camera.fb->len);
-		go_to_sleep = true;
-		WiFi.disconnect();
-	} else {
-		Serial.println("Failed to send photo via MQTT"); // Print error if failed
+void sendBatteryInfo() {
+	uint16_t voltage = TimerCAM.Power.getBatteryVoltage();
+	Serial.print("Voltage = "); Serial.println(voltage);
+	// level will be determined by the raspberry pi
+  	// uint16_t level = TimerCAM.Power.getBatteryLevel();
+	// Serial.print("level = "); Serial.println(level);
+
+	String batterie = String(voltage);
+	String BatterieTopic = mqtt_topic_start + getShortID() + mqtt_topic_batterie;
+	battery_sent = mqttClient.publish(BatterieTopic.c_str(), batterie.c_str());
+	if (battery_sent) {
+		Serial.println("Battery sent via MQTT");
 	}
 
+	esp_sleep_enable_timer_wakeup(battery_interval * 3600 * 1000000); // 24h in µs
 }
