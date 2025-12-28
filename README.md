@@ -48,3 +48,5 @@ Le projet combine des composants électroniques, un système de transmission de 
 ## Schéma Bloc Fonctionnel
 ![Schéma bloc du nichoir](Schema_bloc_fonctionnel.png)
 
+## Schéma électrique
+![Schéma électrique du nichoir](Nichoir/Schema_electrique.png)
