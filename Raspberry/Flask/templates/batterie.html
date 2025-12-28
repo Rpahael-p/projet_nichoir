@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Etat de la batterie</title>
+    <!-- MOBILE -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="p-3">
+
+<a href="{{ url_for('index') }}" class="btn btn-secondary mb-3">Retour</a>
+<h2 class="mb-4">évolution de la batterie</h2>
+
+<form method="GET" class="mb-4">
+    <select name="camera" class="form-select" onchange="this.form.submit()">
+        <option value="">-- Sélectionner une caméra --</option>
+        {% for c in cameras %}
+            <option value="{{ c.mac }}" {% if selected_camera == c.mac %}selected{% endif %}>
+                {{ c.name }}
+            </option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if selected_camera %}
+
+<!-- GRAPHIQUE VOLTAGE -->
+<div class="mb-4">
+    <h5>Tension batterie (V)</h5>
+    <div style="height:300px;">
+        <canvas id="voltageChart"></canvas>
+    </div>
+</div>
+
+<!-- GRAPHIQUE POURCENTAGE -->
+<div class="mb-4">
+    <h5>Niveau batterie (%)</h5>
+    <div style="height:300px;">
+        <canvas id="percentChart"></canvas>
+    </div>
+</div>
+
+<script>
+const labels  = {{ times_json | safe }};
+const voltage = {{ voltage_json | safe }};
+const percent = {{ percent_json | safe }};
+
+// VOLTAGE
+new Chart(document.getElementById("voltageChart"), {
+    type: "line",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Voltage (V)",
+            data: voltage,
+            borderWidth: 2,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: false
+            }
+        }
+    }
+});
+
+// POURCENTAGE
+new Chart(document.getElementById("percentChart"), {
+    type: "line",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Batterie (%)",
+            data: percent,
+            borderWidth: 2,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                min: 0,
+                max: 100
+            }
+        }
+    }
+});
+</script>
+
+{% else %}
+<p class="text-muted">Sélectionnez une caméra pour afficher les graphiques.</p>
+{% endif %}
+
+</body>
+</html>
