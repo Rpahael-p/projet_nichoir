@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Créer un film</title>
+</head>
+<body>
+    <h1>➕ Ajouter un film</h1>
+    <form method="POST">
+        <label>Titre :</label><br>
+        <input type="text" name="titre" required><br><br>
+
+        <label>Note (/5) :</label><br>
+        <input type="number" name="note" min="0" max="5" required><br><br>
+
+        <label>Date de sortie :</label><br>
+        <input type="date" name="date_sortie" required><br><br>
+
+        <label>Durée (minutes) :</label><br>
+        <input type="number" name="duree" required><br><br>
+
+        <label>Genre :</label><br>
+        <select name="id_genre" required>
+            {% for genre in genres %}
+                <option value="{{ genre.id }}">{{ genre.genre }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <button type="submit">Enregistrer</button>
+    </form>
+    <p><a href="/">⬅️ Retour à l'accueil</a></p>
+</body>
+</html>

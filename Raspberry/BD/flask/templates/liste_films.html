@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Liste des films</title>
+</head>
+<body>
+    <h1>🎞️ Liste des films</h1>
+
+    <form method="get" action="/films">
+        <label>Filtrer par titre :</label>
+        <input type="text" name="filtre" value="{{ filtre }}">
+        <button type="submit">Filtrer</button>
+    </form>
+
+    <ul>
+        {% for f in films %}
+            <li>
+                <strong>{{ f.titre }}</strong> — Note : {{ f.note }}/5 — 
+                {{ f.date }} — {{ f.duree }} min — Genre : {{ f.genre.genre }}
+            </li>
+        {% else %}
+            <li>Aucun film trouvé.</li>
+        {% endfor %}
+    </ul>
+
+    <p><a href="/">⬅️ Retour à l'accueil</a></p>
+</body>
+</html>

@@ -1,0 +1,1 @@
+FOLDER = "C:/Users/theod/Desktop/SmartPhotos/"
