@@ -50,3 +50,6 @@ Le projet combine des composants électroniques, un système de transmission de 
 
 ## Schéma électrique
 ![Schéma électrique du nichoir](Nichoir/Schema_electrique.png)
+
+## Le boitier 3D : 
+![Boitier3D](Nichoir/Boitier3D.png)
