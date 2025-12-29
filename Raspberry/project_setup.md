@@ -22,12 +22,12 @@
 La démarrage automatique se fais en créant des services.  
 Le fichier models.py ne doit être lancer qu'une seule fois, dès lors la création d'un service n'est pas nécessaire.
 
-#### 1)&nbsp;Déplacement dans le dossier des services : cd /etc/systemd/system
-#### 2)&nbsp;Création des services : 
+#### 1)&nbsp;Déplacement dans le dossier des services : cd /etc/systemd/system  
+#### 2)&nbsp;Création des services :  
 
-Les chemins doivent être adaptés vers le dossier choisi
+Les chemins doivent être adaptés vers le dossier choisi  
 
-sudo nano Nichoir_ServeurDB.service
+sudo nano Nichoir_ServeurDB.service  
 
     [Unit]
     Description=ServeurDB MQTT Listener Nichoir
@@ -45,7 +45,7 @@ sudo nano Nichoir_ServeurDB.service
     [Install]
     WantedBy=multi-user.target
 
-sudo nano Nichoir_Flask.service
+sudo nano Nichoir_Flask.service  
 
     [Unit]
     Description=Flask App Nichoir
@@ -63,28 +63,28 @@ sudo nano Nichoir_Flask.service
     [Install]
     WantedBy=multi-user.target
 
-#### 3)&nbsp;Actualisation des services : 
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
+#### 3)&nbsp;Actualisation des services :  
+sudo systemctl daemon-reexec  
+sudo systemctl daemon-reload  
 
-#### 4)&nbsp;Activation du démarrage automatique :
-sudo systemctl enable Nichoir_ServeurDB
-sudo systemctl enable Nichoir_Flask
+#### 4)&nbsp;Activation du démarrage automatique :  
+sudo systemctl enable Nichoir_ServeurDB  
+sudo systemctl enable Nichoir_Flask  
 
-#### 5)&nbsp;Démarrage des services :
-sudo systemctl start Nichoir_ServeurDB
-sudo systemctl start Nichoir_Flask
+#### 5)&nbsp;Démarrage des services :  
+sudo systemctl start Nichoir_ServeurDB  
+sudo systemctl start Nichoir_Flask  
 
 ---
 
-#### 6)&nbsp;Vérification de l'état des services :
-systemctl status Nichoir_ServeurDB
-systemctl status Nichoir_Flask
+#### 6)&nbsp;Vérification de l'état des services :  
+systemctl status Nichoir_ServeurDB  
+systemctl status Nichoir_Flask  
 
-#### 7)&nbsp;Affichage des logs des services :
-journalctl -u Nichoir_ServeurDB -f
-journalctl -u Nichoir_Flask -f
+#### 7)&nbsp;Affichage des logs des services :  
+journalctl -u Nichoir_ServeurDB -f  
+journalctl -u Nichoir_Flask -f  
 
-#### 8)&nbsp;Redémarrage d'un service :
-sudo systemctl daemon-reload
-sudo systemctl restart Nichoir_Flask
+#### 8)&nbsp;Redémarrage d'un service :  
+sudo systemctl daemon-reload  
+sudo systemctl restart Nichoir_Flask  
