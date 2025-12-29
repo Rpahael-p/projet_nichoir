@@ -8,8 +8,7 @@ from models import Base, Camera, Image, Batterie
 # =====================
 # CONFIGURATION
 # =====================
-#BROKER_IP = "10.42.0.1"
-BROKER_IP = "192.168.1.60"
+BROKER_IP = "127.0.0.1"
 BROKER_PORT = 1883
 TOPIC_BASE = "TimerCam/#"
 PHOTO_SAVE_DIR = os.path.join(
@@ -22,7 +21,6 @@ os.makedirs(PHOTO_SAVE_DIR, exist_ok=True)
 # IMAGE BUFFER
 # =========================
 image_chunks = {}
-last_image_id = 0
 
 # =====================
 # BASE DE DONNÉES
@@ -72,7 +70,7 @@ def on_message(client, userdata, msg):
         batterie
     """
     print(repr(msg.topic))
-    global image_chunks, last_image_id
+    global image_chunks
     
     try:
         parts = msg.topic.split("/")
@@ -91,31 +89,38 @@ def on_message(client, userdata, msg):
     # -------------------------------------------------
     if data_type == "photo":
         part = rest[0]
-        
+
+        # Créer le buffer pour cette caméra si nécessaire
+        if demi_mac not in image_chunks:
+            image_chunks[demi_mac] = {}
+
+        cam_chunks = image_chunks[demi_mac]
+
         if part == "end":
-            if not image_chunks:
-                print("END reçu mais aucun chunk")
+            if not cam_chunks:
+                print(f"END reçu mais aucun chunk pour {demi_mac}")
                 return
-                
-            expected_indices = list(range(max(image_chunks.keys()) + 1))
-            received_indices = sorted(image_chunks.keys())
+
+            expected_indices = list(range(max(cam_chunks.keys()) + 1))
+            received_indices = sorted(cam_chunks.keys())
             if expected_indices != received_indices:
-                print("Certains chunks sont manquants :", expected_indices, "!= ", received_indices)
-                image_chunks.clear()
+                print(f"Certains chunks sont manquants pour {demi_mac}: {expected_indices} != {received_indices}")
+                del image_chunks[demi_mac]
                 return
 
             filename = os.path.join(PHOTO_SAVE_DIR, f"{demi_mac}_{timestamp.strftime('%y-%m-%d_%H-%M-%S')}.jpg")
 
             try:
                 with open(filename, "wb") as f:
-                    for i in sorted(image_chunks.keys()):
-                        f.write(image_chunks[i])
+                    for i in sorted(cam_chunks.keys()):
+                        f.write(cam_chunks[i])
 
-                total_size = sum(len(c) for c in image_chunks.values())
-                print(f"Image reconstruite : {filename} ({total_size} bytes)")
+                total_size = sum(len(c) for c in cam_chunks.values())
+                print(f"Image reconstruite pour {demi_mac}: {filename} ({total_size} bytes)")
 
-                image_chunks.clear()
-                
+                # Supprimer uniquement les chunks de cette caméra
+                del image_chunks[demi_mac]
+
                 entry = Image(
                     Data=filename,
                     Time=timestamp,
@@ -127,20 +132,19 @@ def on_message(client, userdata, msg):
                 return
             except Exception as e:
                 print(f"Erreur lors de la sauvegarde de l'image : {e}")
-            finally:
-                image_chunks.clear()
-                
+                del image_chunks[demi_mac]
             return
-            
+
+        # Réception d'un chunk normal
         try:
             idx = int(part)
             if idx == 0:
-                image_chunks.clear()
-            image_chunks[idx] = msg.payload
-            print(f"Chunk {idx} reçu ({len(msg.payload)} bytes)")
+                cam_chunks.clear()
+            cam_chunks[idx] = msg.payload
+            print(f"Chunk {idx} reçu pour {demi_mac} ({len(msg.payload)} bytes)")
         except ValueError:
-            print(f"Topic inconnu : {topic}")
-        
+            print(f"Topic inconnu : {msg.topic}")
+            
         
 
     # -------------------------------------------------
