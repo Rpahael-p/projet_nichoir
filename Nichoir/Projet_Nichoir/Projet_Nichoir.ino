@@ -33,7 +33,7 @@ int n = 0;								// Number of Wi-Fi networks found during scan
 
 // MQTT Configuration
 String mqtt_server = "192.168.1.60";				// MQTT broker IP address
-const int   mqtt_port         = 1883;               // MQTT broker port (default: 1883)
+const int mqtt_port = 1883;               			// MQTT broker port (default: 1883)
 
 WiFiClient espClient;                               // Wi-Fi client used by the MQTT client
 PubSubClient mqttClient(espClient);                 // MQTT client instance
@@ -321,25 +321,25 @@ void update_stored_prefs() {	// Function to update all changed parameters
 		prefs.putString("broker", mqtt_server);
 	}
 	if (Resolution != prefs.getUChar("Resolution", 6)) {
-		prefs.putUChar("Resolution", Resolution);
+		prefs.putChar("Resolution", Resolution);
 	}
 	if (photo_attempt != prefs.getUChar("Attempt", 3)) {
-		prefs.putUChar("Attempt", photo_attempt);
+		prefs.putChar("Attempt", photo_attempt);
 	}
 	if (quality != prefs.getUChar("Quality", 31)) {
-		prefs.putUChar("Quality", quality);
+		prefs.putChar("Quality", quality);
 	}
-	if (brightness != prefs.getUChar("Brightness", 0)) {
-		prefs.putUChar("Brightness", brightness);
+	if (brightness != prefs.getChar("Brightness", 0)) {
+		prefs.putChar("Brightness", brightness);
 	}
-	if (contrast != prefs.getUChar("Contrast", 0)) {
-		prefs.putUChar("Contrast", contrast);
+	if (contrast != prefs.getChar("Contrast", 0)) {
+		prefs.putChar("Contrast", contrast);
 	}
-	if (saturation != prefs.getUChar("Saturation", 0)) {
-		prefs.putUChar("Saturation", saturation);
+	if (saturation != prefs.getChar("Saturation", 0)) {
+		prefs.putChar("Saturation", saturation);
 	}
-	if (sharpness != prefs.getUChar("Sharpness", 0)) {
-		prefs.putUChar("Sharpness", sharpness);
+	if (sharpness != prefs.getChar("Sharpness", 0)) {
+		prefs.putChar("Sharpness", sharpness);
 	}
 	if (vflip != prefs.getBool("Vflip", true)) {
 		prefs.putBool("Vflip", vflip);
@@ -379,12 +379,12 @@ void handleConnecting() {
 		mqtt_server = server.arg("broker");
 
 		Resolution = server.arg("resolution").toInt();
-		photo_attempt = server.arg("Attempt").toInt();
-		quality = server.arg("Quality").toInt();
-		brightness = server.arg("Brightness").toInt();
-		contrast = server.arg("Contrast").toInt();
-		saturation = server.arg("Saturation").toInt();
-		sharpness = server.arg("Sharpness").toInt();
+		photo_attempt = constrain(server.arg("Attempt").toInt(), 0, 10);
+		quality = constrain(server.arg("Quality").toInt(), 2, 63);
+		brightness = constrain(server.arg("Brightness").toInt(), -2, 2);
+		contrast = constrain(server.arg("Contrast").toInt(), -2, 2);
+		saturation = constrain(server.arg("Saturation").toInt(), -2, 2);
+		sharpness = constrain(server.arg("Sharpness").toInt(), -2, 2);
 		vflip = server.arg("Vflip") == "1";
 		hmirror = server.arg("Hmirror") == "1";
 
@@ -521,6 +521,7 @@ void setup() {
 		ticker.attach(0.75, blink_cb);
 	} else {
 		// Attempt to connect to stored Wi-Fi network
+		WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
 		WiFi.begin(wifi_ssid, wifi_password);
 		connecting = true;
 		start_connecting = millis();
@@ -551,7 +552,6 @@ void loop() {
 
 		// Check remaining photo attempts
 		if (photo_attempt < 1) {
-			WiFi.disconnect();
 			goToSleep();
 		}
 
@@ -560,7 +560,6 @@ void loop() {
 		send_data();
 	} else if (connecting) {	// Handle Wi-Fi connection timeout
 		if (millis() - start_connecting > connect_timeout) {
-			connecting = false;
 			goToSleep();
 		}
 	}
@@ -596,7 +595,6 @@ void send_data() {
 
 	// Check if both photo and battery data have been successfully sent
 	if (photo_sent && battery_sent) {
-		WiFi.disconnect();
 		goToSleep();
 	}
 }
@@ -655,12 +653,9 @@ void sendPhotoMQTT() {
 	}
 
 	photo_sent = sent;
-	
-	if (photo_sent) {
-		mqttClient.publish((PhotoBaseTopic + "/end").c_str(), "1");			// Send 1 if all chuncks have been succesfully sent
-	} else {
-		mqttClient.publish((PhotoBaseTopic + "/end").c_str(), "0");			// If not send 0
-	}
+	mqttClient.loop();
+	delay(200);
+	mqttClient.publish((PhotoBaseTopic + "/end").c_str(), "end", 1);
 	mqttClient.loop();
 	
 	TimerCAM.Camera.free();                              // Free camera buffer
@@ -670,12 +665,17 @@ void sendBatteryInfo() {
 	// Read battery voltage
 	uint16_t voltage = TimerCAM.Power.getBatteryVoltage();
 	// level will be determined by the raspberry pi
+  	// uint16_t level = TimerCAM.Power.getBatteryLevel();
 
 	// Prepare MQTT topic for battery info
 	String batterie = String(voltage);
 	String BatterieTopic = mqtt_topic_start + getShortID() + mqtt_topic_batterie;
 
 	// Publish battery voltage to MQTT
-	battery_sent = mqttClient.publish(BatterieTopic.c_str(), batterie.c_str());
 	mqttClient.loop();
+	delay(100);
+	battery_sent = mqttClient.publish(BatterieTopic.c_str(), batterie.c_str());
+	delay(20);
+	mqttClient.loop();
+
 }
