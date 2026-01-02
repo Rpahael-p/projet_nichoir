@@ -490,7 +490,11 @@ void goToSleep() {
 	ticker.detach();
 
 	// Schedule wake-up and power off the device
-	TimerCAM.Rtc.setAlarmIRQ(battery_interval * 3600);
+	if (battery_sent) {
+		TimerCAM.Rtc.setAlarmIRQ(battery_interval * 3600);	// if battery level has been send wake up in 24 hours
+	} else {
+		TimerCAM.Rtc.setAlarmIRQ(1800);						// else wake up in 30 minutes
+	}
 	TimerCAM.Power.powerOff();
 }
 
